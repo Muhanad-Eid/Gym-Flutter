@@ -38,21 +38,35 @@ class Subscriber {
   bool get isExpired => daysRemaining < 0;
 
   factory Subscriber.fromMap(Map<String, dynamic> map) {
-    return Subscriber(
-      id: map['id'].toString(),
-      firstName: map['first_name'] ?? '',
-      lastName: map['last_name'] ?? '',
-      gender: map['gender'] ?? '',
-      phoneNumber: map['phone_number'] ?? '',
-      membershipType: map['membership_type'] ?? '',
-      joinDate: DateTime.parse(map['join_date']),
-      expiryDate: DateTime.parse(map['expiry_date']),
-      membershipOffer: map['membership_offer'] ?? '',
-      height: (map['height'] ?? 0).toDouble(),
-      weight: (map['weight'] ?? 0).toDouble(),
-      healthStatus: map['health_status'] ?? '',
-    );
+  double parseDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0;
+    return 0;
   }
+
+  DateTime parseDate(dynamic value) {
+    if (value == null) return DateTime.now(); // fallback if null
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+    if (value is DateTime) return value;
+    return DateTime.now();
+  }
+
+  return Subscriber(
+    id: map['id'].toString(),
+    firstName: map['first_name'] ?? '',
+    lastName: map['last_name'] ?? '',
+    gender: map['gender'] ?? '',
+    phoneNumber: map['phone_number'] ?? '',
+    membershipType: map['membership_type'] ?? '',
+    joinDate: parseDate(map['join_date']),
+    expiryDate: parseDate(map['expiry_date']),
+    membershipOffer: map['membership_offer'] ?? '',
+    height: parseDouble(map['height']),
+    weight: parseDouble(map['weight']),
+    healthStatus: map['health_status'] ?? '',
+  );
+}
+
 
   Map<String, dynamic> toMap() {
     return {
@@ -107,20 +121,23 @@ class _SubscribersPageState extends State<SubscribersPage> {
   }
 
   Future<void> _loadSubscribers() async {
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    try {
-      final response = await _supabase.from('subscribers').select();
-      setState(() {
-        _subscribers = (response as List)
-            .map((data) => Subscriber.fromMap(data))
-            .toList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+  try {
+    final response = await _supabase.from('subscribers').select();
+    print(response); // see what Supabase actually returned
+
+    setState(() {
+      _subscribers = (response as List)
+          .map((data) => Subscriber.fromMap(data))
+          .toList();
+      _isLoading = false;
+    });
+  } catch (e) {
+    setState(() => _isLoading = false);
   }
+}
+
 
   Future<void> _addSubscriber(Subscriber s) async {
     final user = _supabase.auth.currentUser;

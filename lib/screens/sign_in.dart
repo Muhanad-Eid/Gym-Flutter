@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:gym/supabaseconfig.dart';
 
 class SignIn extends StatefulWidget {
   const SignIn({super.key});
@@ -37,7 +38,8 @@ class _SignInState extends State<SignIn> {
     setState(() => _isLoading = true);
 
     try {
-      final supabase = Supabase.instance.client;
+      // ✅ Use SupabaseConfig.client instead of Supabase.instance.client
+      final supabase = SupabaseConfig.client;
 
       // ✅ Sign in with email and password
       final response = await supabase.auth.signInWithPassword(
@@ -54,41 +56,52 @@ class _SignInState extends State<SignIn> {
         }
 
         print("✅ Logged in as: ${response.user!.email}");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Welcome ${response.user!.email}!"),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Welcome ${response.user!.email}!"),
+              duration: const Duration(seconds: 2),
+            ),
+          );
 
-        // ✅ Navigate to home after successful login
-        Navigator.pushReplacementNamed(context, '/home');
+          // ✅ Navigate to home after successful login
+          Navigator.pushReplacementNamed(context, '/home');
+        }
       } else {
         throw AuthException("Login failed: User not found.");
       }
     } on AuthApiException catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.message),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.message),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } on AuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Sign In Failed: $e"),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Sign In Failed: $e"),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -103,7 +116,7 @@ class _SignInState extends State<SignIn> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)], // Purple gradient
+            colors: [Color(0xFF7C3AED), Color(0xFF9F7AEA)],
           ),
         ),
         child: SafeArea(
@@ -125,7 +138,7 @@ class _SignInState extends State<SignIn> {
                         style: TextStyle(
                           fontSize: isSmallScreen ? 45 : 55,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white, // Purple
+                          color: Colors.white,
                         ),
                         children: <TextSpan>[
                           TextSpan(

@@ -54,9 +54,17 @@ class _SignUpState extends State<SignUp> {
     setState(() => _isLoading = true);
 
     try {
+      // Combine first name and last name into display name
+      final displayName = '$firstName $lastName';
+      
       final response = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
+        data: {
+          'display_name': displayName,
+          'first_name': firstName,
+          'last_name': lastName,
+        },
       );
 
       if (response.user != null) {
