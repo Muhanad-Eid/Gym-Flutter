@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gym/widgets/subscriber_card_list.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class Subscriber {
@@ -32,41 +33,43 @@ class Subscriber {
 
   String get fullName => '$firstName $lastName';
 
-  int get daysRemaining => expiryDate.difference(DateTime.now()).inDays;
+  int get daysRemaining {
+    final days = expiryDate.difference(DateTime.now()).inDays;
+    return days < 0 ? 0 : days;
+  }
 
   bool get isExpiringSoon => daysRemaining <= 30 && daysRemaining > 0;
-  bool get isExpired => daysRemaining < 0;
+  bool get isExpired => daysRemaining <= 0;
 
   factory Subscriber.fromMap(Map<String, dynamic> map) {
-  double parseDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0;
-    return 0;
+    double parseDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    DateTime parseDate(dynamic value) {
+      if (value == null) return DateTime.now();
+      if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+      if (value is DateTime) return value;
+      return DateTime.now();
+    }
+
+    return Subscriber(
+      id: map['id'].toString(),
+      firstName: map['first_name'] ?? '',
+      lastName: map['last_name'] ?? '',
+      gender: map['gender'] ?? '',
+      phoneNumber: map['phone_number'] ?? '',
+      membershipType: map['membership_type'] ?? '',
+      joinDate: parseDate(map['join_date']),
+      expiryDate: parseDate(map['expiry_date']),
+      membershipOffer: map['membership_offer'] ?? '',
+      height: parseDouble(map['height']),
+      weight: parseDouble(map['weight']),
+      healthStatus: map['health_status'] ?? '',
+    );
   }
-
-  DateTime parseDate(dynamic value) {
-    if (value == null) return DateTime.now(); // fallback if null
-    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
-    if (value is DateTime) return value;
-    return DateTime.now();
-  }
-
-  return Subscriber(
-    id: map['id'].toString(),
-    firstName: map['first_name'] ?? '',
-    lastName: map['last_name'] ?? '',
-    gender: map['gender'] ?? '',
-    phoneNumber: map['phone_number'] ?? '',
-    membershipType: map['membership_type'] ?? '',
-    joinDate: parseDate(map['join_date']),
-    expiryDate: parseDate(map['expiry_date']),
-    membershipOffer: map['membership_offer'] ?? '',
-    height: parseDouble(map['height']),
-    weight: parseDouble(map['weight']),
-    healthStatus: map['health_status'] ?? '',
-  );
-}
-
 
   Map<String, dynamic> toMap() {
     return {
@@ -97,7 +100,6 @@ class _SubscribersPageState extends State<SubscribersPage> {
   List<Subscriber> _subscribers = [];
   String _searchQuery = '';
   bool _isLoading = true;
-  String _selectedView = 'cards';
 
   @override
   void initState() {
@@ -121,30 +123,31 @@ class _SubscribersPageState extends State<SubscribersPage> {
   }
 
   Future<void> _loadSubscribers() async {
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  try {
-    final response = await _supabase.from('subscribers').select();
-    print(response); // see what Supabase actually returned
+    try {
+      final response = await _supabase.from('subscribers').select();
+      print(response); // see what Supabase actually returned
 
-    setState(() {
-      _subscribers = (response as List)
-          .map((data) => Subscriber.fromMap(data))
-          .toList();
-      _isLoading = false;
-    });
-  } catch (e) {
-    setState(() => _isLoading = false);
+      setState(() {
+        _subscribers = (response as List)
+            .map((data) => Subscriber.fromMap(data))
+            .toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
   }
-}
-
 
   Future<void> _addSubscriber(Subscriber s) async {
     final user = _supabase.auth.currentUser;
     if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You must be logged in to add a subscriber.')),
+          const SnackBar(
+            content: Text('You must be logged in to add a subscriber.'),
+          ),
         );
       }
       return;
@@ -152,19 +155,19 @@ class _SubscribersPageState extends State<SubscribersPage> {
 
     try {
       await _supabase.from('subscribers').insert(s.toMap());
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Subscriber added successfully!')),
         );
       }
-      
+
       await _loadSubscribers();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Insert failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Insert failed: $e')));
       }
     }
   }
@@ -175,9 +178,9 @@ class _SubscribersPageState extends State<SubscribersPage> {
       await _loadSubscribers();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Update failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Update failed: $e')));
       }
     }
   }
@@ -188,9 +191,9 @@ class _SubscribersPageState extends State<SubscribersPage> {
       await _loadSubscribers();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Delete failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Delete failed: $e')));
       }
     }
   }
@@ -218,15 +221,6 @@ class _SubscribersPageState extends State<SubscribersPage> {
         ),
         actions: [
           IconButton(
-            icon: Icon(_selectedView == 'cards' ? Icons.table_chart : Icons.view_agenda),
-            tooltip: _selectedView == 'cards' ? 'Table View' : 'Card View',
-            onPressed: () {
-              setState(() {
-                _selectedView = _selectedView == 'cards' ? 'table' : 'cards';
-              });
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
             onPressed: _loadSubscribers,
@@ -238,11 +232,13 @@ class _SubscribersPageState extends State<SubscribersPage> {
           : Column(
               children: [
                 _buildSearchBar(),
-                _buildViewToggleButtons(),
                 Expanded(
-                  child: _selectedView == 'cards'
-                      ? _buildCardView()
-                      : _buildTableView(),
+                  child: SubscriberCardList(
+                    subscribers: _filteredSubscribers,
+                    onEdit: _showEditDialog,
+                    onDelete: _confirmDelete,
+                    onTap: _showDetailsDialog,
+                  ),
                 ),
               ],
             ),
@@ -261,195 +257,11 @@ class _SubscribersPageState extends State<SubscribersPage> {
         decoration: InputDecoration(
           hintText: 'Search by name or phone...',
           prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           filled: true,
           fillColor: Colors.grey[100],
         ),
         onChanged: (v) => setState(() => _searchQuery = v),
-      ),
-    );
-  }
-
-  Widget _buildViewToggleButtons() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _selectedView = 'cards';
-                });
-              },
-              icon: const Icon(Icons.view_agenda, size: 20),
-              label: const Text('Card View'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedView == 'cards' 
-                    ? Colors.deepPurple 
-                    : Colors.grey[300],
-                foregroundColor: _selectedView == 'cards' 
-                    ? Colors.white 
-                    : Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: _selectedView == 'cards' ? 4 : 1,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _selectedView = 'table';
-                });
-              },
-              icon: const Icon(Icons.table_chart, size: 20),
-              label: const Text('Table View'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedView == 'table' 
-                    ? Colors.deepPurple 
-                    : Colors.grey[300],
-                foregroundColor: _selectedView == 'table' 
-                    ? Colors.white 
-                    : Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                elevation: _selectedView == 'table' ? 4 : 1,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardView() {
-    final list = _filteredSubscribers;
-    if (list.isEmpty) {
-      return const Center(child: Text('No subscribers found'));
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: list.length,
-      itemBuilder: (context, i) {
-        final s = list[i];
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.deepPurple,
-              child: Text(
-                s.firstName.isNotEmpty ? s.firstName[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            title: Text(
-              s.fullName,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text('${s.phoneNumber} • ${s.membershipType}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.orange),
-                  onPressed: () => _showEditDialog(s),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () => _confirmDelete(s),
-                ),
-              ],
-            ),
-            onTap: () => _showDetailsDialog(s),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTableView() {
-    final list = _filteredSubscribers;
-    if (list.isEmpty) {
-      return const Center(child: Text('No subscribers found'));
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: DataTable(
-            headingRowColor: MaterialStateProperty.all(Colors.deepPurple.shade100),
-            columnSpacing: 24,
-            horizontalMargin: 16,
-            columns: const [
-              DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Phone', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Gender', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Type', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Offer', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Days Left', style: TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
-            ],
-            rows: list.map((s) {
-              return DataRow(
-                cells: [
-                  DataCell(
-                    Text(s.fullName),
-                    onTap: () => _showDetailsDialog(s),
-                  ),
-                  DataCell(Text(s.phoneNumber)),
-                  DataCell(Text(s.gender)),
-                  DataCell(Text(s.membershipType)),
-                  DataCell(Text(s.membershipOffer)),
-                  DataCell(
-                    Text(
-                      s.daysRemaining.toString(),
-                      style: TextStyle(
-                        color: s.isExpired
-                            ? Colors.red
-                            : (s.isExpiringSoon ? Colors.orange : Colors.green),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                          onPressed: () => _showEditDialog(s),
-                          tooltip: 'Edit',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                          onPressed: () => _confirmDelete(s),
-                          tooltip: 'Delete',
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
       ),
     );
   }
@@ -466,7 +278,10 @@ class _SubscribersPageState extends State<SubscribersPage> {
     String membershipOfferValue = '1 Month';
     String healthStatusValue = 'Good';
     DateTime joinDateValue = DateTime.now();
-    DateTime expiryDateValue = _calculateExpiryDate(joinDateValue, membershipOfferValue);
+    DateTime expiryDateValue = _calculateExpiryDate(
+      joinDateValue,
+      membershipOfferValue,
+    );
 
     showDialog(
       context: context,
@@ -481,55 +296,99 @@ class _SubscribersPageState extends State<SubscribersPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextField(controller: first, decoration: const InputDecoration(labelText: 'First Name')),
+                    TextField(
+                      controller: first,
+                      decoration: const InputDecoration(
+                        labelText: 'First Name',
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    TextField(controller: last, decoration: const InputDecoration(labelText: 'Last Name')),
+                    TextField(
+                      controller: last,
+                      decoration: const InputDecoration(labelText: 'Last Name'),
+                    ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: genderValue,
-                      items: ['Male', 'Female'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                      onChanged: (v) => setDialogState(() => genderValue = v ?? 'Male'),
+                      items: ['Male', 'Female']
+                          .map(
+                            (g) => DropdownMenuItem(value: g, child: Text(g)),
+                          )
+                          .toList(),
+                      onChanged: (v) =>
+                          setDialogState(() => genderValue = v ?? 'Male'),
                       decoration: const InputDecoration(labelText: 'Gender'),
                     ),
                     const SizedBox(height: 12),
-                    TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone')),
+                    TextField(
+                      controller: phone,
+                      decoration: const InputDecoration(labelText: 'Phone'),
+                    ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: membershipTypeValue,
-                      items: ['Basic', 'Premium'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                      onChanged: (v) => setDialogState(() => membershipTypeValue = v ?? 'Basic'),
-                      decoration: const InputDecoration(labelText: 'Membership Type'),
+                      items: ['Basic', 'Premium']
+                          .map(
+                            (v) => DropdownMenuItem(value: v, child: Text(v)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setDialogState(
+                        () => membershipTypeValue = v ?? 'Basic',
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Membership Type',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: membershipOfferValue,
-                      items: ['1 Month', '3 Months', '6 Months', '1 Year'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                      items: ['1 Month', '3 Months', '6 Months', '1 Year']
+                          .map(
+                            (v) => DropdownMenuItem(value: v, child: Text(v)),
+                          )
+                          .toList(),
                       onChanged: (v) {
                         setDialogState(() {
                           membershipOfferValue = v ?? '1 Month';
-                          expiryDateValue = _calculateExpiryDate(joinDateValue, membershipOfferValue);
+                          expiryDateValue = _calculateExpiryDate(
+                            joinDateValue,
+                            membershipOfferValue,
+                          );
                         });
                       },
-                      decoration: const InputDecoration(labelText: 'Membership Offer'),
+                      decoration: const InputDecoration(
+                        labelText: 'Membership Offer',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: height,
-                      decoration: const InputDecoration(labelText: 'Height (cm)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Height (cm)',
+                      ),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: weight,
-                      decoration: const InputDecoration(labelText: 'Weight (kg)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Weight (kg)',
+                      ),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: healthStatusValue,
-                      items: ['Good', 'Not Good'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                      onChanged: (v) => setDialogState(() => healthStatusValue = v ?? 'Good'),
-                      decoration: const InputDecoration(labelText: 'Health Status'),
+                      items: ['Good', 'Not Good']
+                          .map(
+                            (v) => DropdownMenuItem(value: v, child: Text(v)),
+                          )
+                          .toList(),
+                      onChanged: (v) =>
+                          setDialogState(() => healthStatusValue = v ?? 'Good'),
+                      decoration: const InputDecoration(
+                        labelText: 'Health Status',
+                      ),
                     ),
                   ],
                 ),
@@ -597,55 +456,99 @@ class _SubscribersPageState extends State<SubscribersPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    TextField(controller: first, decoration: const InputDecoration(labelText: 'First Name')),
+                    TextField(
+                      controller: first,
+                      decoration: const InputDecoration(
+                        labelText: 'First Name',
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    TextField(controller: last, decoration: const InputDecoration(labelText: 'Last Name')),
+                    TextField(
+                      controller: last,
+                      decoration: const InputDecoration(labelText: 'Last Name'),
+                    ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: genderValue,
-                      items: ['Male', 'Female'].map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                      onChanged: (v) => setDialogState(() => genderValue = v ?? 'Male'),
+                      items: ['Male', 'Female']
+                          .map(
+                            (g) => DropdownMenuItem(value: g, child: Text(g)),
+                          )
+                          .toList(),
+                      onChanged: (v) =>
+                          setDialogState(() => genderValue = v ?? 'Male'),
                       decoration: const InputDecoration(labelText: 'Gender'),
                     ),
                     const SizedBox(height: 12),
-                    TextField(controller: phone, decoration: const InputDecoration(labelText: 'Phone')),
+                    TextField(
+                      controller: phone,
+                      decoration: const InputDecoration(labelText: 'Phone'),
+                    ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: membershipTypeValue,
-                      items: ['Basic', 'Premium'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                      onChanged: (v) => setDialogState(() => membershipTypeValue = v ?? 'Basic'),
-                      decoration: const InputDecoration(labelText: 'Membership Type'),
+                      items: ['Basic', 'Premium']
+                          .map(
+                            (v) => DropdownMenuItem(value: v, child: Text(v)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setDialogState(
+                        () => membershipTypeValue = v ?? 'Basic',
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'Membership Type',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: membershipOfferValue,
-                      items: ['1 Month', '3 Months', '6 Months', '1 Year'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                      items: ['1 Month', '3 Months', '6 Months', '1 Year']
+                          .map(
+                            (v) => DropdownMenuItem(value: v, child: Text(v)),
+                          )
+                          .toList(),
                       onChanged: (v) {
                         setDialogState(() {
                           membershipOfferValue = v ?? '1 Month';
-                          expiryDateValue = _calculateExpiryDate(joinDateValue, membershipOfferValue);
+                          expiryDateValue = _calculateExpiryDate(
+                            joinDateValue,
+                            membershipOfferValue,
+                          );
                         });
                       },
-                      decoration: const InputDecoration(labelText: 'Membership Offer'),
+                      decoration: const InputDecoration(
+                        labelText: 'Membership Offer',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: height,
-                      decoration: const InputDecoration(labelText: 'Height (cm)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Height (cm)',
+                      ),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: weight,
-                      decoration: const InputDecoration(labelText: 'Weight (kg)'),
+                      decoration: const InputDecoration(
+                        labelText: 'Weight (kg)',
+                      ),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: healthStatusValue,
-                      items: ['Good', 'Not Good'].map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
-                      onChanged: (v) => setDialogState(() => healthStatusValue = v ?? 'Good'),
-                      decoration: const InputDecoration(labelText: 'Health Status'),
+                      items: ['Good', 'Not Good']
+                          .map(
+                            (v) => DropdownMenuItem(value: v, child: Text(v)),
+                          )
+                          .toList(),
+                      onChanged: (v) =>
+                          setDialogState(() => healthStatusValue = v ?? 'Good'),
+                      decoration: const InputDecoration(
+                        labelText: 'Health Status',
+                      ),
                     ),
                   ],
                 ),
@@ -726,19 +629,33 @@ class _SubscribersPageState extends State<SubscribersPage> {
               const SizedBox(height: 12),
               _buildDetailRow(Icons.person, 'Gender', s.gender),
               const SizedBox(height: 12),
-              _buildDetailRow(Icons.card_membership, 'Membership', s.membershipType),
+              _buildDetailRow(
+                Icons.card_membership,
+                'Membership',
+                s.membershipType,
+              ),
               const SizedBox(height: 12),
               _buildDetailRow(Icons.local_offer, 'Offer', s.membershipOffer),
               const SizedBox(height: 12),
-              _buildDetailRow(Icons.timer, 'Days Left', s.daysRemaining.toString(),
-                color: s.isExpired ? Colors.red : (s.isExpiringSoon ? Colors.orange : Colors.green)),
+              _buildDetailRow(
+                Icons.timer,
+                'Days Left',
+                s.daysRemaining.toString(),
+                color: s.isExpired
+                    ? Colors.red
+                    : (s.isExpiringSoon ? Colors.orange : Colors.green),
+              ),
               const SizedBox(height: 12),
               _buildDetailRow(Icons.height, 'Height', '${s.height} cm'),
               const SizedBox(height: 12),
               _buildDetailRow(Icons.monitor_weight, 'Weight', '${s.weight} kg'),
               const SizedBox(height: 12),
-              _buildDetailRow(Icons.favorite, 'Health', s.healthStatus,
-                color: s.healthStatus == 'Good' ? Colors.green : Colors.red),
+              _buildDetailRow(
+                Icons.favorite,
+                'Health',
+                s.healthStatus,
+                color: s.healthStatus == 'Good' ? Colors.green : Colors.red,
+              ),
             ],
           ),
         ),
@@ -760,7 +677,12 @@ class _SubscribersPageState extends State<SubscribersPage> {
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String label, String value, {Color? color}) {
+  Widget _buildDetailRow(
+    IconData icon,
+    String label,
+    String value, {
+    Color? color,
+  }) {
     return Row(
       children: [
         Icon(icon, size: 20, color: Colors.deepPurple),

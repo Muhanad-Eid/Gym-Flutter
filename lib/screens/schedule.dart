@@ -81,14 +81,30 @@ class SchedulePage extends StatefulWidget {
 
 class _SchedulePageState extends State<SchedulePage> {
   final supabase = Supabase.instance.client;
-  String selectedView = 'week';
+  String selectedView = 'list';
   DateTime selectedDate = DateTime.now();
   String selectedFilter = 'All';
   List<GymClass> classes = [];
   bool isLoading = true;
 
-  final List<String> weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  final List<String> categories = ['All', 'Cardio', 'Strength', 'Yoga', 'Pilates', 'Cycling', 'Dance'];
+  final List<String> weekDays = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun',
+  ];
+  final List<String> categories = [
+    'All',
+    'Cardio',
+    'Strength',
+    'Yoga',
+    'Pilates',
+    'Cycling',
+    'Dance',
+  ];
 
   @override
   void initState() {
@@ -98,7 +114,7 @@ class _SchedulePageState extends State<SchedulePage> {
 
   Future<void> fetchClasses() async {
     setState(() => isLoading = true);
-    
+
     try {
       final response = await supabase
           .from('gym_classes')
@@ -114,9 +130,9 @@ class _SchedulePageState extends State<SchedulePage> {
     } catch (e) {
       setState(() => isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading classes: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading classes: $e')));
       }
     }
   }
@@ -136,10 +152,7 @@ class _SchedulePageState extends State<SchedulePage> {
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: fetchClasses,
-          ),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: fetchClasses),
           IconButton(
             icon: const Icon(Icons.calendar_today),
             onPressed: () async {
@@ -197,38 +210,49 @@ class _SchedulePageState extends State<SchedulePage> {
                       backgroundColor: Colors.white,
                       selectedColor: Colors.deepPurple.shade100,
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.deepPurple : Colors.grey[700],
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected
+                            ? Colors.deepPurple
+                            : Colors.grey[700],
+                        fontWeight: isSelected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   );
                 },
               ),
             ),
-            
+
             // Content
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : classes.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.event_busy, size: 80, color: Colors.grey[400]),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No classes available',
-                                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                              ),
-                            ],
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.event_busy,
+                            size: 80,
+                            color: Colors.grey[400],
                           ),
-                        )
-                      : selectedView == 'list'
-                          ? _buildListView()
-                          : selectedView == 'day'
-                              ? _buildDayView()
-                              : _buildWeekView(),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No classes available',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : selectedView == 'list'
+                  ? _buildListView()
+                  : selectedView == 'day'
+                  ? _buildDayView()
+                  : _buildWeekView(),
             ),
           ],
         ),
@@ -243,8 +267,10 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 
   Widget _buildWeekView() {
-    final startOfWeek = selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
-    
+    final startOfWeek = selectedDate.subtract(
+      Duration(days: selectedDate.weekday - 1),
+    );
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -292,7 +318,10 @@ class _SchedulePageState extends State<SchedulePage> {
                         ),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.deepPurple,
                             borderRadius: BorderRadius.circular(12),
@@ -351,7 +380,9 @@ class _SchedulePageState extends State<SchedulePage> {
                 icon: const Icon(Icons.chevron_left),
                 onPressed: () {
                   setState(() {
-                    selectedDate = selectedDate.subtract(const Duration(days: 1));
+                    selectedDate = selectedDate.subtract(
+                      const Duration(days: 1),
+                    );
                   });
                 },
               ),
@@ -402,7 +433,8 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 
   Widget _buildListView() {
-    final sortedClasses = filteredClasses..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final sortedClasses = filteredClasses
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -414,7 +446,10 @@ class _SchedulePageState extends State<SchedulePage> {
   }
 
   Widget _buildClassCard(GymClass gymClass) {
-    final timeFormat = DateFormat('HH:mm').format(gymClass.startTime) + ' - ' + DateFormat('HH:mm').format(gymClass.endTime);
+    final timeFormat =
+        DateFormat('HH:mm').format(gymClass.startTime) +
+        ' - ' +
+        DateFormat('HH:mm').format(gymClass.endTime);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -424,9 +459,7 @@ class _SchedulePageState extends State<SchedulePage> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(4),
-            border: Border(
-              left: BorderSide(color: gymClass.color, width: 4),
-            ),
+            border: Border(left: BorderSide(color: gymClass.color, width: 4)),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -449,7 +482,11 @@ class _SchedulePageState extends State<SchedulePage> {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              Icon(Icons.person, size: 14, color: Colors.grey[600]),
+                              Icon(
+                                Icons.person,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 gymClass.instructor,
@@ -464,7 +501,10 @@ class _SchedulePageState extends State<SchedulePage> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: gymClass.color.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
@@ -488,9 +528,19 @@ class _SchedulePageState extends State<SchedulePage> {
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                        Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
                         const SizedBox(width: 4),
-                        Text(timeFormat, style: TextStyle(color: Colors.grey[700], fontSize: 14)),
+                        Text(
+                          timeFormat,
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
                     ),
                     Row(
@@ -498,7 +548,13 @@ class _SchedulePageState extends State<SchedulePage> {
                       children: [
                         Icon(Icons.schedule, size: 16, color: Colors.grey[600]),
                         const SizedBox(width: 4),
-                        Text('${gymClass.duration} min', style: TextStyle(color: Colors.grey[700], fontSize: 14)),
+                        Text(
+                          '${gymClass.duration} min',
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
                     ),
                     Row(
@@ -506,7 +562,13 @@ class _SchedulePageState extends State<SchedulePage> {
                       children: [
                         Icon(Icons.room, size: 16, color: Colors.grey[600]),
                         const SizedBox(width: 4),
-                        Text(gymClass.room, style: TextStyle(color: Colors.grey[700], fontSize: 14)),
+                        Text(
+                          gymClass.room,
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -525,13 +587,18 @@ class _SchedulePageState extends State<SchedulePage> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: gymClass.occupancyRate > 80 ? Colors.red : Colors.green,
+                                  color: gymClass.occupancyRate > 80
+                                      ? Colors.red
+                                      : Colors.green,
                                 ),
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 'enrolled',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                             ],
                           ),
@@ -541,7 +608,9 @@ class _SchedulePageState extends State<SchedulePage> {
                             child: LinearProgressIndicator(
                               value: gymClass.occupancyRate / 100,
                               backgroundColor: Colors.grey[300],
-                              color: gymClass.occupancyRate > 80 ? Colors.red : Colors.green,
+                              color: gymClass.occupancyRate > 80
+                                  ? Colors.red
+                                  : Colors.green,
                               minHeight: 6,
                             ),
                           ),
@@ -550,12 +619,18 @@ class _SchedulePageState extends State<SchedulePage> {
                     ),
                     const SizedBox(width: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(gymClass.level, style: const TextStyle(fontSize: 12)),
+                      child: Text(
+                        gymClass.level,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                 ),
@@ -605,7 +680,11 @@ class _SchedulePageState extends State<SchedulePage> {
                         color: gymClass.color.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.fitness_center, color: gymClass.color, size: 32),
+                      child: Icon(
+                        Icons.fitness_center,
+                        color: gymClass.color,
+                        size: 32,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -614,7 +693,10 @@ class _SchedulePageState extends State<SchedulePage> {
                         children: [
                           Text(
                             gymClass.name,
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           Text(
                             gymClass.category,
@@ -635,14 +717,30 @@ class _SchedulePageState extends State<SchedulePage> {
                   style: TextStyle(color: Colors.grey[700], fontSize: 16),
                 ),
                 const SizedBox(height: 24),
-                _buildDetailRow(Icons.person, 'Instructor', gymClass.instructor),
-                _buildDetailRow(Icons.access_time, 'Time', 
-                    DateFormat('HH:mm').format(gymClass.startTime) + ' - ' + DateFormat('HH:mm').format(gymClass.endTime)),
-                _buildDetailRow(Icons.schedule, 'Duration', '${gymClass.duration} minutes'),
+                _buildDetailRow(
+                  Icons.person,
+                  'Instructor',
+                  gymClass.instructor,
+                ),
+                _buildDetailRow(
+                  Icons.access_time,
+                  'Time',
+                  DateFormat('HH:mm').format(gymClass.startTime) +
+                      ' - ' +
+                      DateFormat('HH:mm').format(gymClass.endTime),
+                ),
+                _buildDetailRow(
+                  Icons.schedule,
+                  'Duration',
+                  '${gymClass.duration} minutes',
+                ),
                 _buildDetailRow(Icons.room, 'Room', gymClass.room),
                 _buildDetailRow(Icons.trending_up, 'Level', gymClass.level),
-                _buildDetailRow(Icons.people, 'Capacity', 
-                    '${gymClass.enrolled}/${gymClass.capacity} (${gymClass.occupancyRate.toStringAsFixed(0)}%)'),
+                _buildDetailRow(
+                  Icons.people,
+                  'Capacity',
+                  '${gymClass.enrolled}/${gymClass.capacity} (${gymClass.occupancyRate.toStringAsFixed(0)}%)',
+                ),
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -699,7 +797,10 @@ class _SchedulePageState extends State<SchedulePage> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
           Expanded(
-            child: Text(value, style: TextStyle(color: Colors.grey[700], fontSize: 16)),
+            child: Text(
+              value,
+              style: TextStyle(color: Colors.grey[700], fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -712,7 +813,7 @@ class _SchedulePageState extends State<SchedulePage> {
     final descController = TextEditingController();
     final capacityController = TextEditingController();
     final roomController = TextEditingController();
-    
+
     DateTime startTime = DateTime.now();
     DateTime endTime = DateTime.now().add(const Duration(hours: 1));
     String selectedLevel = 'Beginner';
@@ -799,10 +900,15 @@ class _SchedulePageState extends State<SchedulePage> {
                             labelText: 'Category',
                             border: OutlineInputBorder(),
                           ),
-                          items: categories.skip(1).map((cat) => DropdownMenuItem(
-                            value: cat,
-                            child: Text(cat),
-                          )).toList(),
+                          items: categories
+                              .skip(1)
+                              .map(
+                                (cat) => DropdownMenuItem(
+                                  value: cat,
+                                  child: Text(cat),
+                                ),
+                              )
+                              .toList(),
                           onChanged: (value) {
                             setDialogState(() => selectedCategory = value!);
                           },
@@ -816,12 +922,20 @@ class _SchedulePageState extends State<SchedulePage> {
                             labelText: 'Level',
                             border: OutlineInputBorder(),
                           ),
-                          items: ['Beginner', 'Intermediate', 'Advanced', 'All Levels']
-                              .map((level) => DropdownMenuItem(
-                                    value: level,
-                                    child: Text(level),
-                                  ))
-                              .toList(),
+                          items:
+                              [
+                                    'Beginner',
+                                    'Intermediate',
+                                    'Advanced',
+                                    'All Levels',
+                                  ]
+                                  .map(
+                                    (level) => DropdownMenuItem(
+                                      value: level,
+                                      child: Text(level),
+                                    ),
+                                  )
+                                  .toList(),
                           onChanged: (value) {
                             setDialogState(() => selectedLevel = value!);
                           },
@@ -836,23 +950,31 @@ class _SchedulePageState extends State<SchedulePage> {
                       labelText: 'Color',
                       border: OutlineInputBorder(),
                     ),
-                    items: colorOptions.entries.map((entry) => DropdownMenuItem(
-                      value: entry.value,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: Color(int.parse(entry.value.replaceFirst('#', '0xFF'))),
-                              borderRadius: BorderRadius.circular(4),
+                    items: colorOptions.entries
+                        .map(
+                          (entry) => DropdownMenuItem(
+                            value: entry.value,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Color(
+                                      int.parse(
+                                        entry.value.replaceFirst('#', '0xFF'),
+                                      ),
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(entry.key),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(entry.key),
-                        ],
-                      ),
-                    )).toList(),
+                        )
+                        .toList(),
                     onChanged: (value) {
                       setDialogState(() => selectedColor = value!);
                     },
@@ -860,7 +982,9 @@ class _SchedulePageState extends State<SchedulePage> {
                   const SizedBox(height: 12),
                   ListTile(
                     title: const Text('Start Time'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy HH:mm').format(startTime)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy HH:mm').format(startTime),
+                    ),
                     trailing: const Icon(Icons.access_time),
                     onTap: () async {
                       final date = await showDatePicker(
@@ -876,7 +1000,13 @@ class _SchedulePageState extends State<SchedulePage> {
                         );
                         if (time != null) {
                           setDialogState(() {
-                            startTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                            startTime = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            );
                           });
                         }
                       }
@@ -884,7 +1014,9 @@ class _SchedulePageState extends State<SchedulePage> {
                   ),
                   ListTile(
                     title: const Text('End Time'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy HH:mm').format(endTime)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy HH:mm').format(endTime),
+                    ),
                     trailing: const Icon(Icons.access_time),
                     onTap: () async {
                       final date = await showDatePicker(
@@ -900,7 +1032,13 @@ class _SchedulePageState extends State<SchedulePage> {
                         );
                         if (time != null) {
                           setDialogState(() {
-                            endTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                            endTime = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            );
                           });
                         }
                       }
@@ -933,21 +1071,21 @@ class _SchedulePageState extends State<SchedulePage> {
 
                 try {
                   await supabase.from('gym_classes').insert(classData);
-                  
+
                   if (!context.mounted) return;
                   Navigator.pop(context);
-                  
+
                   fetchClasses(); // Changed: removed await to prevent duplicate calls
-                  
+
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Class added successfully')),
                   );
                 } catch (e) {
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               },
               child: const Text('Add'),
@@ -960,11 +1098,15 @@ class _SchedulePageState extends State<SchedulePage> {
 
   void _showEditClassDialog(GymClass gymClass) {
     final nameController = TextEditingController(text: gymClass.name);
-    final instructorController = TextEditingController(text: gymClass.instructor);
+    final instructorController = TextEditingController(
+      text: gymClass.instructor,
+    );
     final descController = TextEditingController(text: gymClass.description);
-    final capacityController = TextEditingController(text: gymClass.capacity.toString());
+    final capacityController = TextEditingController(
+      text: gymClass.capacity.toString(),
+    );
     final roomController = TextEditingController(text: gymClass.room);
-    
+
     DateTime startTime = gymClass.startTime;
     DateTime endTime = gymClass.endTime;
     String selectedLevel = gymClass.level;
@@ -1051,10 +1193,15 @@ class _SchedulePageState extends State<SchedulePage> {
                             labelText: 'Category',
                             border: OutlineInputBorder(),
                           ),
-                          items: categories.skip(1).map((cat) => DropdownMenuItem(
-                            value: cat,
-                            child: Text(cat),
-                          )).toList(),
+                          items: categories
+                              .skip(1)
+                              .map(
+                                (cat) => DropdownMenuItem(
+                                  value: cat,
+                                  child: Text(cat),
+                                ),
+                              )
+                              .toList(),
                           onChanged: (value) {
                             setDialogState(() => selectedCategory = value!);
                           },
@@ -1068,12 +1215,20 @@ class _SchedulePageState extends State<SchedulePage> {
                             labelText: 'Level',
                             border: OutlineInputBorder(),
                           ),
-                          items: ['Beginner', 'Intermediate', 'Advanced', 'All Levels']
-                              .map((level) => DropdownMenuItem(
-                                    value: level,
-                                    child: Text(level),
-                                  ))
-                              .toList(),
+                          items:
+                              [
+                                    'Beginner',
+                                    'Intermediate',
+                                    'Advanced',
+                                    'All Levels',
+                                  ]
+                                  .map(
+                                    (level) => DropdownMenuItem(
+                                      value: level,
+                                      child: Text(level),
+                                    ),
+                                  )
+                                  .toList(),
                           onChanged: (value) {
                             setDialogState(() => selectedLevel = value!);
                           },
@@ -1088,23 +1243,31 @@ class _SchedulePageState extends State<SchedulePage> {
                       labelText: 'Color',
                       border: OutlineInputBorder(),
                     ),
-                    items: colorOptions.entries.map((entry) => DropdownMenuItem(
-                      value: entry.value,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: Color(int.parse(entry.value.replaceFirst('#', '0xFF'))),
-                              borderRadius: BorderRadius.circular(4),
+                    items: colorOptions.entries
+                        .map(
+                          (entry) => DropdownMenuItem(
+                            value: entry.value,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: BoxDecoration(
+                                    color: Color(
+                                      int.parse(
+                                        entry.value.replaceFirst('#', '0xFF'),
+                                      ),
+                                    ),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(entry.key),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(entry.key),
-                        ],
-                      ),
-                    )).toList(),
+                        )
+                        .toList(),
                     onChanged: (value) {
                       setDialogState(() => selectedColor = value!);
                     },
@@ -1112,7 +1275,9 @@ class _SchedulePageState extends State<SchedulePage> {
                   const SizedBox(height: 12),
                   ListTile(
                     title: const Text('Start Time'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy HH:mm').format(startTime)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy HH:mm').format(startTime),
+                    ),
                     trailing: const Icon(Icons.access_time),
                     onTap: () async {
                       final date = await showDatePicker(
@@ -1128,7 +1293,13 @@ class _SchedulePageState extends State<SchedulePage> {
                         );
                         if (time != null) {
                           setDialogState(() {
-                            startTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                            startTime = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            );
                           });
                         }
                       }
@@ -1136,7 +1307,9 @@ class _SchedulePageState extends State<SchedulePage> {
                   ),
                   ListTile(
                     title: const Text('End Time'),
-                    subtitle: Text(DateFormat('dd/MM/yyyy HH:mm').format(endTime)),
+                    subtitle: Text(
+                      DateFormat('dd/MM/yyyy HH:mm').format(endTime),
+                    ),
                     trailing: const Icon(Icons.access_time),
                     onTap: () async {
                       final date = await showDatePicker(
@@ -1152,7 +1325,13 @@ class _SchedulePageState extends State<SchedulePage> {
                         );
                         if (time != null) {
                           setDialogState(() {
-                            endTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                            endTime = DateTime(
+                              date.year,
+                              date.month,
+                              date.day,
+                              time.hour,
+                              time.minute,
+                            );
                           });
                         }
                       }
@@ -1188,21 +1367,21 @@ class _SchedulePageState extends State<SchedulePage> {
                       .from('gym_classes')
                       .update(classData)
                       .eq('id', gymClass.id);
-                  
+
                   if (!context.mounted) return;
                   Navigator.pop(context);
-                  
+
                   fetchClasses(); // Changed: removed await to prevent duplicate calls
-                  
+
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Class updated successfully')),
                   );
                 } catch (e) {
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
               },
               child: const Text('Update'),
@@ -1231,27 +1410,24 @@ class _SchedulePageState extends State<SchedulePage> {
                     .from('gym_classes')
                     .delete()
                     .eq('id', gymClass.id);
-                
+
                 if (!context.mounted) return;
                 Navigator.pop(context);
-                
+
                 fetchClasses(); // Changed: removed await to prevent duplicate calls
-                
+
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Class deleted successfully')),
                 );
               } catch (e) {
                 if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: $e')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Error: $e')));
               }
             },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),

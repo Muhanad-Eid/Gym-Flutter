@@ -49,7 +49,7 @@ class SubscriptionPlan {
 }
 
 class SubscriptionsPlansPage extends StatefulWidget {
-  const SubscriptionsPlansPage({Key? key}) : super(key: key);
+  const SubscriptionsPlansPage({super.key});
 
   @override
   State<SubscriptionsPlansPage> createState() => _SubscriptionsPlansPageState();
@@ -57,9 +57,9 @@ class SubscriptionsPlansPage extends StatefulWidget {
 
 class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
   final supabase = Supabase.instance.client;
-  String selectedView = 'grid'; // 'grid' or 'table'
   List<SubscriptionPlan> plans = [];
   bool isLoading = true;
+  bool showInactivePlans = false;
 
   @override
   void initState() {
@@ -69,7 +69,7 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
 
   Future<void> fetchPlans() async {
     setState(() => isLoading = true);
-    
+
     try {
       final response = await supabase
           .from('subscription_plans')
@@ -85,11 +85,19 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
     } catch (e) {
       setState(() => isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading plans: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading plans: $e')));
       }
     }
+  }
+
+  // New method to get filtered plans
+  List<SubscriptionPlan> get filteredPlans {
+    if (showInactivePlans) {
+      return plans;
+    }
+    return plans.where((plan) => plan.isActive).toList();
   }
 
   Color getTypeColor(String type) {
@@ -99,7 +107,7 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
       case 'standard':
         return Colors.blue;
       case 'basic':
-        return Colors.grey;
+        return Colors.indigo;
       default:
         return Colors.black;
     }
@@ -121,10 +129,17 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
   void showAddEditDialog({SubscriptionPlan? plan}) {
     final nameController = TextEditingController(text: plan?.name ?? '');
     final descController = TextEditingController(text: plan?.description ?? '');
-    final priceController = TextEditingController(text: plan?.price.toString() ?? '');
-    final durationController = TextEditingController(text: plan?.durationMonths.toString() ?? '');
-    final discountController = TextEditingController(text: plan?.discount ?? 'None');
+    final priceController = TextEditingController(
+      text: plan?.price.toString() ?? '',
+    );
+    final durationController = TextEditingController(
+      text: plan?.durationMonths.toString() ?? '',
+    );
+    final discountController = TextEditingController(
+      text: plan?.discount ?? 'None',
+    );
     String selectedType = plan?.type ?? 'Basic';
+    bool isActive = plan?.isActive ?? true;
 
     showDialog(
       context: context,
@@ -180,10 +195,10 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                       border: OutlineInputBorder(),
                     ),
                     items: ['Basic', 'Standard', 'Premium']
-                        .map((type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(type),
-                            ))
+                        .map(
+                          (type) =>
+                              DropdownMenuItem(value: type, child: Text(type)),
+                        )
                         .toList(),
                     onChanged: (value) {
                       setDialogState(() => selectedType = value!);
@@ -196,6 +211,42 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                       border: OutlineInputBorder(),
                     ),
                     controller: discountController,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'Plan Status:',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          isActive ? 'Active' : 'Inactive',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: isActive ? Colors.green : Colors.red,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: isActive,
+                          onChanged: (value) {
+                            setDialogState(() => isActive = value);
+                          },
+                          activeColor: Colors.green,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -215,7 +266,7 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                   'duration_months': int.tryParse(durationController.text) ?? 1,
                   'type': selectedType,
                   'discount': discountController.text,
-                  'is_active': true,
+                  'is_active': isActive,
                 };
 
                 try {
@@ -227,10 +278,10 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                         .update(planData)
                         .eq('id', plan.id);
                   }
-                  
+
                   Navigator.pop(context);
                   fetchPlans();
-                  
+
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -244,9 +295,9 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
                   }
                 }
               },
@@ -266,12 +317,14 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
         actions: [
           IconButton(
             icon: Icon(
-              selectedView == 'grid' ? Icons.table_chart : Icons.grid_view,
+              showInactivePlans ? Icons.visibility_off : Icons.visibility,
             ),
-            tooltip: selectedView == 'grid' ? 'Table View' : 'Grid View',
+            tooltip: showInactivePlans
+                ? 'Hide Inactive Plans'
+                : 'Show Inactive Plans',
             onPressed: () {
               setState(() {
-                selectedView = selectedView == 'grid' ? 'table' : 'grid';
+                showInactivePlans = !showInactivePlans;
               });
             },
           ),
@@ -297,100 +350,50 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
               child: _buildStatCard(
                 'Total Plans',
-                plans.length.toString(),
+                filteredPlans.length.toString(),
                 Icons.card_membership,
                 Colors.blue,
               ),
             ),
-            
-            // View Toggle Buttons
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          selectedView = 'grid';
-                        });
-                      },
-                      icon: const Icon(Icons.grid_view, size: 20),
-                      label: const Text('Grid View'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: selectedView == 'grid' 
-                            ? Colors.deepPurple 
-                            : Colors.grey[300],
-                        foregroundColor: selectedView == 'grid' 
-                            ? Colors.white 
-                            : Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        elevation: selectedView == 'grid' ? 4 : 1,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          selectedView = 'table';
-                        });
-                      },
-                      icon: const Icon(Icons.table_chart, size: 20),
-                      label: const Text('Table View'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: selectedView == 'table' 
-                            ? Colors.deepPurple 
-                            : Colors.grey[300],
-                        foregroundColor: selectedView == 'table' 
-                            ? Colors.white 
-                            : Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        elevation: selectedView == 'table' ? 4 : 1,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
+
             // View Content
             Expanded(
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : plans.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.inbox_outlined,
-                                size: 80,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No plans available',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Click the button below to add your first plan',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
+                  : filteredPlans.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.inbox_outlined,
+                            size: 80,
+                            color: Colors.grey[400],
                           ),
-                        )
-                      : selectedView == 'grid'
-                          ? _buildGridView()
-                          : _buildTableView(),
+                          const SizedBox(height: 16),
+                          Text(
+                            showInactivePlans
+                                ? 'No plans available'
+                                : 'No active plans available',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            showInactivePlans
+                                ? 'Click the button below to add your first plan'
+                                : 'Toggle the visibility icon to show inactive plans',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _buildGridView(),
             ),
           ],
         ),
@@ -404,7 +407,12 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
@@ -466,7 +474,8 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
 
         final double horizontalPadding = 16 * 2;
         final double spacing = 18 * (crossAxisCount - 1);
-        final double availableWidth = constraints.maxWidth - horizontalPadding - spacing;
+        final double availableWidth =
+            constraints.maxWidth - horizontalPadding - spacing;
         final double cardWidth = availableWidth / crossAxisCount;
 
         return SingleChildScrollView(
@@ -474,11 +483,8 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
           child: Wrap(
             spacing: 18,
             runSpacing: 18,
-            children: plans.map((plan) {
-              return SizedBox(
-                width: cardWidth,
-                child: _buildPlanCard(plan),
-              );
+            children: filteredPlans.map((plan) {
+              return SizedBox(width: cardWidth, child: _buildPlanCard(plan));
             }).toList(),
           ),
         );
@@ -487,6 +493,18 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
   }
 
   Widget _buildPlanCard(SubscriptionPlan plan) {
+    // Precompute discount values so we don't declare variables inside the widget tree
+    final bool hasDiscount =
+        plan.discount != 'None' &&
+        double.tryParse(plan.discount) != null &&
+        double.parse(plan.discount) > 0;
+    final double discountPercent = hasDiscount
+        ? double.parse(plan.discount)
+        : 0;
+    final double discountedPrice = hasDiscount
+        ? plan.price - (plan.price * discountPercent / 100)
+        : plan.price;
+
     return Card(
       elevation: 5,
       shadowColor: getTypeColor(plan.type).withOpacity(0.18),
@@ -497,10 +515,7 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              getTypeColor(plan.type).withOpacity(0.1),
-              Colors.white,
-            ],
+            colors: [getTypeColor(plan.type).withOpacity(0.1), Colors.white],
           ),
         ),
         child: Column(
@@ -574,8 +589,9 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 13),
-                  
-                  if (plan.discount != 'None')
+
+                  // Discount info (computed above)
+                  if (hasDiscount)
                     Container(
                       margin: const EdgeInsets.only(bottom: 13),
                       padding: const EdgeInsets.symmetric(
@@ -587,7 +603,7 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        "${plan.discount}% Discount",
+                        "${plan.discount}% OFF",
                         style: TextStyle(
                           color: Colors.green.shade700,
                           fontSize: 12,
@@ -595,16 +611,33 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                         ),
                       ),
                     ),
-                  
+
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      if (hasDiscount) ...[
+                        // Old price with strikethrough
+                        Text(
+                          '${plan.price.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey[500],
+                            decoration: TextDecoration.lineThrough,
+                            decorationThickness: 2,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      // New/Current price
                       Text(
-                        '\$${plan.price.toStringAsFixed(0)}',
+                        '${discountedPrice.toStringAsFixed(0)}\$',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: getTypeColor(plan.type),
+                          color: hasDiscount
+                              ? Colors.green.shade700
+                              : getTypeColor(plan.type),
                         ),
                       ),
                       const SizedBox(width: 3),
@@ -661,7 +694,9 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Delete Plan'),
-                            content: Text('Are you sure you want to delete "${plan.name}"?'),
+                            content: Text(
+                              'Are you sure you want to delete "${plan.name}"?',
+                            ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
@@ -677,15 +712,21 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                                     Navigator.pop(context);
                                     fetchPlans();
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
-                                          content: Text('Plan deleted successfully'),
+                                          content: Text(
+                                            'Plan deleted successfully',
+                                          ),
                                         ),
                                       );
                                     }
                                   } catch (e) {
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         SnackBar(content: Text('Error: $e')),
                                       );
                                     }
@@ -700,7 +741,11 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
                           ),
                         );
                       },
-                      icon: const Icon(Icons.delete, color: Colors.red, size: 20),
+                      icon: const Icon(
+                        Icons.delete,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                       padding: const EdgeInsets.all(11),
                       constraints: const BoxConstraints(),
                     ),
@@ -709,197 +754,6 @@ class _SubscriptionsPlansPageState extends State<SubscriptionsPlansPage> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTableView() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: DataTableTheme(
-            data: DataTableThemeData(
-              headingRowColor: MaterialStatePropertyAll(Colors.deepPurple.shade100),
-              headingTextStyle: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                color: Colors.deepPurple,
-              ),
-              dataTextStyle: const TextStyle(fontSize: 13),
-              dataRowMinHeight: 52,
-              dataRowMaxHeight: 62,
-            ),
-            child: DataTable(
-              columnSpacing: 28,
-              horizontalMargin: 16,
-              columns: const [
-                DataColumn(label: Text('Plan Name')),
-                DataColumn(label: Text('Type')),
-                DataColumn(label: Text('Price')),
-                DataColumn(label: Text('Duration')),
-                DataColumn(label: Text('Discount')),
-                DataColumn(label: Text('Status')),
-                DataColumn(label: Text('Actions')),
-              ],
-              rows: plans.map((plan) {
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            getTypeIcon(plan.type),
-                            color: getTypeColor(plan.type),
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            plan.name,
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: getTypeColor(plan.type).withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: getTypeColor(plan.type)),
-                        ),
-                        child: Text(
-                          plan.type,
-                          style: TextStyle(
-                            color: getTypeColor(plan.type),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Text(
-                        '\$${plan.price.toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    DataCell(Text('${plan.durationMonths} months')),
-                    DataCell(
-                      Text(
-                        plan.discount,
-                        style: TextStyle(
-                          color: plan.discount != 'None'
-                              ? Colors.green.shade700
-                              : Colors.grey,
-                          fontWeight: plan.discount != 'None'
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: plan.isActive
-                              ? Colors.green.shade100
-                              : Colors.red.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          plan.isActive ? 'Active' : 'Inactive',
-                          style: TextStyle(
-                            color: plan.isActive
-                                ? Colors.green.shade700
-                                : Colors.red.shade700,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.edit, color: Colors.blue, size: 20),
-                            onPressed: () => showAddEditDialog(plan: plan),
-                            tooltip: 'Edit',
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Delete Plan'),
-                                  content: Text(
-                                    'Are you sure you want to delete "${plan.name}"?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () async {
-                                        try {
-                                          await supabase
-                                              .from('subscription_plans')
-                                              .delete()
-                                              .eq('id', plan.id);
-                                          
-                                          Navigator.pop(context);
-                                          fetchPlans();
-                                          
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Plan deleted successfully'),
-                                              ),
-                                            );
-                                          }
-                                        } catch (e) {
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(content: Text('Error: $e')),
-                                            );
-                                          }
-                                        }
-                                      },
-                                      child: const Text(
-                                        'Delete',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                            tooltip: 'Delete',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
         ),
       ),
     );

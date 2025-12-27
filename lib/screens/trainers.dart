@@ -12,11 +12,11 @@ class TrainersPage extends StatefulWidget {
 class _TrainersPageState extends State<TrainersPage> {
   final supabase = Supabase.instance.client;
   final TextEditingController _searchController = TextEditingController();
-  
+
   List<Map<String, dynamic>> trainers = [];
   List<Map<String, dynamic>> filteredTrainers = [];
   bool isLoading = false;
-  bool isAdmin = false;
+
   String? _selectedSpecialty;
   bool _sortAscending = true;
   bool _showInactive = false;
@@ -24,7 +24,7 @@ class _TrainersPageState extends State<TrainersPage> {
   @override
   void initState() {
     super.initState();
-    _checkAdminStatus();
+
     _loadTrainers();
   }
 
@@ -34,37 +34,20 @@ class _TrainersPageState extends State<TrainersPage> {
     super.dispose();
   }
 
-  Future<void> _checkAdminStatus() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user != null) {
-        final response = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-        
-        setState(() {
-          isAdmin = response['role'] == 'admin';
-        });
-      }
-    } catch (e) {
-      setState(() => isAdmin = false);
-    }
-  }
-
   Future<void> _loadTrainers() async {
     try {
       setState(() => isLoading = true);
-      
+
       var query = supabase
           .from('trainers')
-          .select('id, name, specialty, avatar_url, hourly_rate, is_active, created_at');
-      
+          .select(
+            'id, name, specialty, avatar_url, hourly_rate, is_active, created_at',
+          );
+
       if (!_showInactive) {
         query = query.eq('is_active', true);
       }
-      
+
       final response = await query.order('name');
 
       setState(() {
@@ -80,15 +63,17 @@ class _TrainersPageState extends State<TrainersPage> {
 
   void _applyFilters() {
     final query = _searchController.text.trim().toLowerCase();
-    
+
     filteredTrainers = trainers.where((trainer) {
-      final matchesQuery = query.isEmpty ||
+      final matchesQuery =
+          query.isEmpty ||
           trainer['name'].toString().toLowerCase().contains(query) ||
           trainer['specialty'].toString().toLowerCase().contains(query);
-      
-      final matchesSpecialty = _selectedSpecialty == null ||
+
+      final matchesSpecialty =
+          _selectedSpecialty == null ||
           trainer['specialty'] == _selectedSpecialty;
-      
+
       return matchesQuery && matchesSpecialty;
     }).toList();
 
@@ -107,7 +92,9 @@ class _TrainersPageState extends State<TrainersPage> {
 
   void _showAddEditDialog({Map<String, dynamic>? trainer}) {
     final nameController = TextEditingController(text: trainer?['name'] ?? '');
-    final specialtyController = TextEditingController(text: trainer?['specialty'] ?? '');
+    final specialtyController = TextEditingController(
+      text: trainer?['specialty'] ?? '',
+    );
     final rateController = TextEditingController(
       text: trainer?['hourly_rate']?.toString() ?? '',
     );
@@ -167,7 +154,8 @@ class _TrainersPageState extends State<TrainersPage> {
                   keyboardType: TextInputType.number,
                   validator: (value) {
                     if (value?.isEmpty ?? true) return 'Rate is required';
-                    if (double.tryParse(value!) == null) return 'Invalid number';
+                    if (double.tryParse(value!) == null)
+                      return 'Invalid number';
                     return null;
                   },
                 ),
@@ -242,11 +230,10 @@ class _TrainersPageState extends State<TrainersPage> {
     try {
       setState(() => isLoading = true);
 
-      await supabase.from('trainers').update({
-        'name': name,
-        'specialty': specialty,
-        'hourly_rate': rate,
-      }).eq('id', id.toString());
+      await supabase
+          .from('trainers')
+          .update({'name': name, 'specialty': specialty, 'hourly_rate': rate})
+          .eq('id', id.toString());
 
       await _loadTrainers();
       if (mounted) {
@@ -266,24 +253,83 @@ class _TrainersPageState extends State<TrainersPage> {
   Future<void> _toggleActiveStatus(Map<String, dynamic> trainer) async {
     final isActive = trainer['is_active'] == true;
     final newStatus = !isActive;
-    
+
     try {
       setState(() => isLoading = true);
 
-      await supabase.from('trainers').update({
-        'is_active': newStatus,
-      }).eq('id', trainer['id'].toString());
+      final response = await supabase
+          .from('trainers')
+          .update({'is_active': newStatus})
+          .eq('id', trainer['id'].toString());
 
-      await _loadTrainers();
-      
-      if (mounted) {
-        _showSuccess(
-          newStatus 
-            ? '${trainer['name']} is now active' 
-            : '${trainer['name']} is now inactive'
-        );
+      // Diagnostic: print the response so we can inspect permission failures in logs
+      print('Toggle active response: $response');
+
+      // Verify the trainer's status directly from the DB to avoid false negatives
+      // when the trainer is excluded by client-side filters after a reload.
+      try {
+        final verify = await supabase
+            .from('trainers')
+            .select('is_active')
+            .eq('id', trainer['id'].toString())
+            .maybeSingle();
+
+        print('Toggle active verify result: $verify');
+
+        bool? remoteStatus;
+        if (verify != null && verify.containsKey('is_active')) {
+          final v = verify['is_active'];
+          if (v is bool)
+            remoteStatus = v;
+          else if (v is int)
+            remoteStatus = v == 1;
+          else if (v is String)
+            remoteStatus = v.toLowerCase() == 'true' || v == 't' || v == '1';
+        }
+
+        if (remoteStatus != null && remoteStatus == newStatus) {
+          // Verified — refresh and show success
+          await _loadTrainers();
+          if (mounted) {
+            _showSuccess(
+              newStatus
+                  ? '${trainer['name']} is now active'
+                  : '${trainer['name']} is now inactive',
+            );
+          }
+        } else {
+          // Extract server-provided message if present for clarity.
+          String serverMessage =
+              'Failed to update trainer status — you may not have permission to perform this action.';
+          if (response is Map) {
+            if (response.containsKey('message') &&
+                response['message'] != null) {
+              serverMessage = response['message'].toString();
+            } else if (response.containsKey('error') &&
+                response['error'] != null) {
+              serverMessage = response['error'].toString();
+            }
+          } else if (response is List && response.isEmpty) {
+            serverMessage =
+                'No rows were returned; refresh completed but the trainer status did not change. Likely blocked by row-level security (permission denied).';
+          }
+
+          print(
+            'Toggle active failure detail after verify: response=$response verify=$verify',
+          );
+
+          if (mounted) {
+            _showError(serverMessage);
+          }
+        }
+      } catch (e) {
+        print('Toggle active verify error: $e');
+        if (mounted) {
+          _showError('Failed to verify trainer status: $e');
+        }
       }
     } catch (e) {
+      print('Toggle active error: $e');
       if (mounted) {
         _showError('Failed to update trainer status: $e');
       }
@@ -337,7 +383,7 @@ class _TrainersPageState extends State<TrainersPage> {
       await supabase.from('trainers').delete().eq('id', id.toString());
 
       await _loadTrainers();
-      
+
       if (mounted) {
         _showSuccess('Deleted $name');
       }
@@ -389,7 +435,9 @@ class _TrainersPageState extends State<TrainersPage> {
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
     return (parts[0].isNotEmpty ? parts[0][0].toUpperCase() : '') +
-        (parts.length > 1 && parts[1].isNotEmpty ? parts[1][0].toUpperCase() : '');
+        (parts.length > 1 && parts[1].isNotEmpty
+            ? parts[1][0].toUpperCase()
+            : '');
   }
 
   @override
@@ -397,23 +445,25 @@ class _TrainersPageState extends State<TrainersPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Trainers', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Trainers',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
-          if (isAdmin)
-            IconButton(
-              icon: Icon(_showInactive ? Icons.visibility : Icons.visibility_off),
-              onPressed: () {
-                setState(() {
-                  _showInactive = !_showInactive;
-                });
-                _loadTrainers();
-              },
-              tooltip: _showInactive ? 'Hide inactive' : 'Show inactive',
-            ),
+          IconButton(
+            icon: Icon(_showInactive ? Icons.visibility : Icons.visibility_off),
+            onPressed: () {
+              setState(() {
+                _showInactive = !_showInactive;
+              });
+              _loadTrainers();
+            },
+            tooltip: _showInactive ? 'Hide inactive' : 'Show inactive',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadTrainers,
@@ -450,7 +500,9 @@ class _TrainersPageState extends State<TrainersPage> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -472,18 +524,24 @@ class _TrainersPageState extends State<TrainersPage> {
                       itemBuilder: (context) {
                         final list = ['All', ..._specialties.toList()..sort()];
                         return list
-                            .map((s) => PopupMenuItem<String>(
-                                  value: s,
-                                  child: Row(
-                                    children: [
-                                      if (s == _selectedSpecialty || (s == 'All' && _selectedSpecialty == null))
-                                        const Icon(Icons.check, size: 20),
-                                      if (s == _selectedSpecialty || (s == 'All' && _selectedSpecialty == null))
-                                        const SizedBox(width: 8),
-                                      Text(s),
-                                    ],
-                                  ),
-                                ))
+                            .map(
+                              (s) => PopupMenuItem<String>(
+                                value: s,
+                                child: Row(
+                                  children: [
+                                    if (s == _selectedSpecialty ||
+                                        (s == 'All' &&
+                                            _selectedSpecialty == null))
+                                      const Icon(Icons.check, size: 20),
+                                    if (s == _selectedSpecialty ||
+                                        (s == 'All' &&
+                                            _selectedSpecialty == null))
+                                      const SizedBox(width: 8),
+                                    Text(s),
+                                  ],
+                                ),
+                              ),
+                            )
                             .toList();
                       },
                     ),
@@ -541,44 +599,44 @@ class _TrainersPageState extends State<TrainersPage> {
             child: isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : filteredTrainers.isEmpty
-                    ? _buildEmptyState()
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isWide = constraints.maxWidth >= 700;
-                          if (isWide) {
-                            final crossAxisCount = (constraints.maxWidth ~/ 300).clamp(2, 4);
-                            return GridView.builder(
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                ? _buildEmptyState()
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isWide = constraints.maxWidth >= 700;
+                      if (isWide) {
+                        final crossAxisCount = (constraints.maxWidth ~/ 300)
+                            .clamp(2, 4);
+                        return GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: crossAxisCount,
                                 crossAxisSpacing: 16,
                                 mainAxisSpacing: 16,
                                 childAspectRatio: 1.1,
                               ),
-                              itemCount: filteredTrainers.length,
-                              itemBuilder: (context, index) =>
-                                  _buildTrainerCard(filteredTrainers[index]),
-                            );
-                          }
-                          return ListView.separated(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: filteredTrainers.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) =>
-                                _buildTrainerTile(filteredTrainers[index]),
-                          );
-                        },
-                      ),
+                          itemCount: filteredTrainers.length,
+                          itemBuilder: (context, index) =>
+                              _buildTrainerCard(filteredTrainers[index]),
+                        );
+                      }
+                      return ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredTrainers.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) =>
+                            _buildTrainerTile(filteredTrainers[index]),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
-      floatingActionButton: isAdmin
-          ? FloatingActionButton.extended(
-              onPressed: () => _showAddEditDialog(),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Trainer'),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddEditDialog(),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Trainer'),
+      ),
     );
   }
 
@@ -602,7 +660,7 @@ class _TrainersPageState extends State<TrainersPage> {
             'Try adjusting your search or filters',
             style: TextStyle(color: Colors.grey.shade500),
           ),
-          if (isAdmin && trainers.isEmpty) ...[
+          if (trainers.isEmpty) ...[
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: () => _showAddEditDialog(),
@@ -617,7 +675,7 @@ class _TrainersPageState extends State<TrainersPage> {
 
   Widget _buildTrainerTile(Map<String, dynamic> trainer) {
     final isInactive = trainer['is_active'] == false;
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -654,9 +712,10 @@ class _TrainersPageState extends State<TrainersPage> {
                 ),
               ),
               if (isInactive)
-                const Chip(
-                  label: Text('Inactive', style: TextStyle(fontSize: 10)),
-                  padding: EdgeInsets.symmetric(horizontal: 4),
+                Chip(
+                  label: const Text('Inactive', style: TextStyle(fontSize: 10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  color: MaterialStatePropertyAll(Colors.redAccent),
                   visualDensity: VisualDensity.compact,
                 ),
             ],
@@ -667,7 +726,11 @@ class _TrainersPageState extends State<TrainersPage> {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.fitness_center, size: 16, color: Colors.grey),
+                  const Icon(
+                    Icons.fitness_center,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(width: 6),
                   Text(trainer['specialty']),
                 ],
@@ -687,60 +750,58 @@ class _TrainersPageState extends State<TrainersPage> {
               ),
             ],
           ),
-          trailing: isAdmin
-              ? PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _showAddEditDialog(trainer: trainer);
-                    } else if (value == 'toggle_status') {
-                      _toggleActiveStatus(trainer);
-                    } else if (value == 'delete') {
-                      _showDeleteConfirmation(trainer);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 20),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
+          trailing: PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'edit') {
+                _showAddEditDialog(trainer: trainer);
+              } else if (value == 'toggle_status') {
+                _toggleActiveStatus(trainer);
+              } else if (value == 'delete') {
+                _showDeleteConfirmation(trainer);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit, size: 20),
+                    SizedBox(width: 8),
+                    Text('Edit'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'toggle_status',
+                child: Row(
+                  children: [
+                    Icon(
+                      isInactive ? Icons.check_circle : Icons.cancel,
+                      size: 20,
+                      color: isInactive ? Colors.green : Colors.orange,
                     ),
-                    PopupMenuItem(
-                      value: 'toggle_status',
-                      child: Row(
-                        children: [
-                          Icon(
-                            isInactive ? Icons.check_circle : Icons.cancel,
-                            size: 20,
-                            color: isInactive ? Colors.green : Colors.orange,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isInactive ? 'Mark as Active' : 'Mark as Inactive',
-                            style: TextStyle(
-                              color: isInactive ? Colors.green : Colors.orange,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 20, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
+                    const SizedBox(width: 8),
+                    Text(
+                      isInactive ? 'Mark as Active' : 'Mark as Inactive',
+                      style: TextStyle(
+                        color: isInactive ? Colors.green : Colors.orange,
                       ),
                     ),
                   ],
-                )
-              : null,
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete, size: 20, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Delete', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -748,7 +809,7 @@ class _TrainersPageState extends State<TrainersPage> {
 
   Widget _buildTrainerCard(Map<String, dynamic> trainer) {
     final isInactive = trainer['is_active'] == false;
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -763,7 +824,9 @@ class _TrainersPageState extends State<TrainersPage> {
                 tag: 'trainer_${trainer['id']}',
                 child: CircleAvatar(
                   radius: 40,
-                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer,
                   backgroundImage: trainer['avatar_url'] != null
                       ? CachedNetworkImageProvider(trainer['avatar_url'])
                       : null,
@@ -773,7 +836,9 @@ class _TrainersPageState extends State<TrainersPage> {
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onPrimaryContainer,
                           ),
                         )
                       : null,
@@ -793,15 +858,15 @@ class _TrainersPageState extends State<TrainersPage> {
               const SizedBox(height: 4),
               Text(
                 trainer['specialty'],
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.shade50,
                   borderRadius: BorderRadius.circular(20),
@@ -823,28 +888,26 @@ class _TrainersPageState extends State<TrainersPage> {
                   visualDensity: VisualDensity.compact,
                 ),
               ],
-              if (isAdmin) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () => _showAddEditDialog(trainer: trainer),
-                      tooltip: 'Edit',
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () => _showAddEditDialog(trainer: trainer),
+                    tooltip: 'Edit',
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      isInactive ? Icons.check_circle : Icons.cancel,
+                      size: 20,
+                      color: isInactive ? Colors.green : Colors.orange,
                     ),
-                    IconButton(
-                      icon: Icon(
-                        isInactive ? Icons.check_circle : Icons.cancel,
-                        size: 20,
-                        color: isInactive ? Colors.green : Colors.orange,
-                      ),
-                      onPressed: () => _toggleActiveStatus(trainer),
-                      tooltip: isInactive ? 'Mark as Active' : 'Mark as Inactive',
-                    ),
-                  ],
-                ),
-              ],
+                    onPressed: () => _toggleActiveStatus(trainer),
+                    tooltip: isInactive ? 'Mark as Active' : 'Mark as Inactive',
+                  ),
+                ],
+              ),
             ],
           ),
         ),

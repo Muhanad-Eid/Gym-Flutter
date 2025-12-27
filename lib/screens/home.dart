@@ -43,7 +43,7 @@ class _GymHomePageState extends State<GymHomePage> {
   Future<Map<String, dynamic>> _fetchHomeData() async {
     try {
       final user = Supabase.instance.client.auth.currentUser;
-      
+
       final membersResponse = await Supabase.instance.client
           .from('subscribers')
           .select('id');
@@ -55,14 +55,10 @@ class _GymHomePageState extends State<GymHomePage> {
       return {
         'totalMembers': membersResponse.length,
         'totalTrainers': trainersResponse.length,
-        'userName': user?.email?.split('@').first ?? 'Admin',
+        'userName': user?.email?.split('@')[0] ?? 'Admin',
       };
     } catch (error) {
-      return {
-        'totalMembers': 0,
-        'totalTrainers': 0,
-        'userName': 'Admin',
-      };
+      return {'totalMembers': 0, 'totalTrainers': 0, 'userName': 'Admin'};
     }
   }
 
@@ -77,10 +73,7 @@ class _GymHomePageState extends State<GymHomePage> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Colors.deepPurple.shade50,
-              Colors.blue.shade50,
-            ],
+            colors: [Colors.deepPurple.shade50, Colors.blue.shade50],
           ),
         ),
         child: SafeArea(
@@ -96,10 +89,11 @@ class _GymHomePageState extends State<GymHomePage> {
                       FutureBuilder<Map<String, dynamic>>(
                         future: _homeDataFuture,
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
                             return _buildWelcomeCardSkeleton(isSmallScreen);
                           }
-                          
+
                           final data = snapshot.data ?? {};
                           return _buildWelcomeCard(isSmallScreen, data);
                         },
@@ -173,18 +167,6 @@ class _GymHomePageState extends State<GymHomePage> {
               ],
             ),
             const Spacer(),
-            Container(
-              padding: EdgeInsets.all(isSmallScreen ? 6 : 8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.notifications_outlined,
-                color: const Color(0xFF2C3E50),
-                size: isSmallScreen ? 20 : 24,
-              ),
-            ),
             SizedBox(width: isSmallScreen ? 8 : 12),
             InkWell(
               onTap: () async {
@@ -300,10 +282,7 @@ class _GymHomePageState extends State<GymHomePage> {
   }
 
   Widget _buildWelcomeCard(bool isSmallScreen, Map<String, dynamic> data) {
-    return AnimatedWelcomeCard(
-      isSmallScreen: isSmallScreen,
-      data: data,
-    );
+    return AnimatedWelcomeCard(isSmallScreen: isSmallScreen, data: data);
   }
 
   Widget _buildMenuGrid(BuildContext context, bool isSmallScreen) {
@@ -477,20 +456,38 @@ class _AnimatedWelcomeCardState extends State<AnimatedWelcomeCard>
       vsync: this,
     )..repeat(reverse: true);
 
-    _col1Animation = Tween<Offset>(
-      begin: const Offset(0, 0),
-      end: const Offset(0, -8),
-    ).animate(CurvedAnimation(parent: _iconColumn1Controller, curve: Curves.easeInOut));
+    _col1Animation =
+        Tween<Offset>(
+          begin: const Offset(0, 0),
+          end: const Offset(0, -8),
+        ).animate(
+          CurvedAnimation(
+            parent: _iconColumn1Controller,
+            curve: Curves.easeInOut,
+          ),
+        );
 
-    _col2Animation = Tween<Offset>(
-      begin: const Offset(0, 0),
-      end: const Offset(0, -8),
-    ).animate(CurvedAnimation(parent: _iconColumn2Controller, curve: Curves.easeInOut));
+    _col2Animation =
+        Tween<Offset>(
+          begin: const Offset(0, 0),
+          end: const Offset(0, -8),
+        ).animate(
+          CurvedAnimation(
+            parent: _iconColumn2Controller,
+            curve: Curves.easeInOut,
+          ),
+        );
 
-    _col3Animation = Tween<Offset>(
-      begin: const Offset(0, 0),
-      end: const Offset(0, -8),
-    ).animate(CurvedAnimation(parent: _iconColumn3Controller, curve: Curves.easeInOut));
+    _col3Animation =
+        Tween<Offset>(
+          begin: const Offset(0, 0),
+          end: const Offset(0, -8),
+        ).animate(
+          CurvedAnimation(
+            parent: _iconColumn3Controller,
+            curve: Curves.easeInOut,
+          ),
+        );
 
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) _iconColumn2Controller.forward();
@@ -555,7 +552,7 @@ class _AnimatedWelcomeCardState extends State<AnimatedWelcomeCard>
       animation: _backgroundController,
       builder: (context, child) {
         final progress = _backgroundController.value;
-        
+
         return Container(
           width: double.infinity,
           padding: EdgeInsets.all(widget.isSmallScreen ? 20 : 24),
@@ -595,19 +592,10 @@ class _AnimatedWelcomeCardState extends State<AnimatedWelcomeCard>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Welcome Back, ${widget.data['userName']}!',
+                          'welcome back, ${widget.data['userName']}!',
                           style: TextStyle(
-                            fontSize: widget.isSmallScreen ? 22 : 24,
-                            fontWeight: FontWeight.bold,
+                            fontSize: widget.isSmallScreen ? 13 : 18,
                             color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: widget.isSmallScreen ? 6 : 8),
-                        Text(
-                          'Manage gym efficiently',
-                          style: TextStyle(
-                            fontSize: widget.isSmallScreen ? 13 : 14,
-                            color: Colors.white70,
                           ),
                         ),
                       ],
@@ -649,9 +637,7 @@ class _AnimatedWelcomeCardState extends State<AnimatedWelcomeCard>
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.2),
-                  ),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -688,11 +674,7 @@ class _AnimatedWelcomeCardState extends State<AnimatedWelcomeCard>
     return Expanded(
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: Colors.white,
-            size: isSmallScreen ? 20 : 24,
-          ),
+          Icon(icon, color: Colors.white, size: isSmallScreen ? 20 : 24),
           SizedBox(height: isSmallScreen ? 4 : 6),
           Text(
             value,
@@ -842,10 +824,7 @@ class PlaceholderPage extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'This page is under development',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
             ),
           ],
         ),
